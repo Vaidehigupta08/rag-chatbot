@@ -3,248 +3,202 @@ from app import rag_pipeline
 from memory import record_feedback, get_feedback_summary
 
 st.set_page_config(
-    page_title="WebCrawl AI — Docs Assistant",
-    page_icon="🔎",
+    page_title="Crawl4AI Assistant",
+    page_icon="🕸️",
     layout="centered"
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
-/* ── Base ── */
+/* ── Reset & Base ── */
 html, body, [class*="css"] {
-    font-family: 'Space Mono', monospace;
-    background-color: #0a0a0f;
-    color: #c8c8d4;
+    font-family: 'Inter', sans-serif;
+    background-color: #f9f7f4;
+    color: #1a1a1a;
 }
 
 .stApp {
-    background: #0a0a0f;
+    background-color: #f9f7f4;
 }
 
-/* ── Animated grain overlay ── */
-.stApp::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.6;
+.main .block-container {
+    max-width: 720px;
+    padding-top: 2rem;
+    padding-bottom: 6rem;
 }
 
 /* ── Title ── */
 h1 {
-    font-family: 'Syne', sans-serif !important;
-    font-weight: 800 !important;
-    font-size: 2rem !important;
-    letter-spacing: -0.03em !important;
-    color: #f0f0ff !important;
-    padding-bottom: 0 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 1.4rem !important;
+    color: #1a1a1a !important;
+    letter-spacing: -0.02em !important;
+    margin-bottom: 0 !important;
 }
 
-/* ── Caption ── */
 .stApp .stCaption p {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.68rem;
-    color: #4a9eff;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border-left: 2px solid #4a9eff;
-    padding-left: 8px;
-    margin-top: -4px;
+    font-size: 0.75rem !important;
+    color: #999 !important;
+    margin-top: 2px !important;
 }
 
 /* ── Chat messages ── */
 [data-testid="stChatMessage"] {
-    background: #111118 !important;
-    border: 1px solid #1e1e2e !important;
-    border-radius: 4px !important;
-    padding: 14px 18px !important;
-    margin-bottom: 8px !important;
-    position: relative;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 20px 0 !important;
+    border-bottom: 1px solid #f0ede8 !important;
+    margin-bottom: 0 !important;
 }
 
-/* User message accent */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    border-left: 3px solid #4a9eff !important;
-    background: #0d0d1a !important;
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) p {
+    font-weight: 500 !important;
+    color: #1a1a1a !important;
 }
 
-/* Assistant message accent */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
-    border-left: 3px solid #00ffaa !important;
-    background: #0a0f0d !important;
-}
-
-/* ── Avatar icons ── */
+/* ── Avatars ── */
 [data-testid="chatAvatarIcon-user"] {
-    background: #1a1a3e !important;
-    color: #4a9eff !important;
+    background: #e8632a !important;
+    color: #fff !important;
+    border-radius: 6px !important;
 }
 
 [data-testid="chatAvatarIcon-assistant"] {
-    background: #0a1f16 !important;
-    color: #00ffaa !important;
+    background: #1a1a1a !important;
+    color: #fff !important;
+    border-radius: 6px !important;
 }
 
 /* ── Message text ── */
 [data-testid="stChatMessage"] p {
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.82rem !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.9rem !important;
     line-height: 1.75 !important;
-    color: #c8c8d4 !important;
+    color: #2a2a2a !important;
 }
 
-/* Code blocks inside chat */
 [data-testid="stChatMessage"] code {
-    background: #1a1a2e !important;
-    color: #00ffaa !important;
-    border-radius: 3px !important;
-    padding: 1px 5px !important;
-    font-size: 0.78rem !important;
+    background: #f0ede8 !important;
+    color: #c4370a !important;
+    border-radius: 4px !important;
+    padding: 1px 6px !important;
+    font-size: 0.82rem !important;
+    font-family: 'SF Mono', 'Fira Code', monospace !important;
 }
 
 [data-testid="stChatMessage"] pre {
-    background: #0d0d1a !important;
-    border: 1px solid #1e1e3e !important;
-    border-radius: 4px !important;
-    padding: 12px !important;
+    background: #1e1e1e !important;
+    border-radius: 10px !important;
+    padding: 16px !important;
+    border: none !important;
 }
 
-/* ── Chat input ── */
+[data-testid="stChatMessage"] pre code {
+    background: transparent !important;
+    color: #e8e8e8 !important;
+    font-size: 0.8rem !important;
+}
+
+/* ── Chat Input ── */
 [data-testid="stChatInput"] {
-    background: #111118 !important;
-    border: 1px solid #2a2a3e !important;
-    border-radius: 4px !important;
+    background: #fff !important;
+    border: 1.5px solid #e8e2d9 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06) !important;
 }
 
 [data-testid="stChatInput"]:focus-within {
-    border-color: #4a9eff !important;
-    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15) !important;
+    border-color: #e8632a !important;
+    box-shadow: 0 2px 16px rgba(232, 99, 42, 0.12) !important;
 }
 
 [data-testid="stChatInput"] textarea {
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.82rem !important;
-    color: #e0e0f0 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.9rem !important;
+    color: #1a1a1a !important;
     background: transparent !important;
 }
 
 [data-testid="stChatInput"] textarea::placeholder {
-    color: #3a3a5a !important;
+    color: #bbb !important;
 }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: #080810 !important;
-    border-right: 1px solid #1e1e2e !important;
-}
-
-[data-testid="stSidebar"] h2 {
-    font-family: 'Syne', sans-serif !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-    color: #4a9eff !important;
-    letter-spacing: 0.12em !important;
-    text-transform: uppercase !important;
+    background: #fff !important;
+    border-right: 1px solid #f0ede8 !important;
 }
 
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] li {
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.72rem !important;
-    color: #7a7a9a !important;
-    line-height: 1.8 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.8rem !important;
+    color: #555 !important;
+    line-height: 1.9 !important;
 }
 
-[data-testid="stSidebar"] strong {
-    color: #c8c8d4 !important;
-}
-
-/* Sidebar info box */
 [data-testid="stSidebar"] [data-testid="stAlert"] {
-    background: #0d0d1a !important;
-    border: 1px solid #2a2a3e !important;
-    border-radius: 4px !important;
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.72rem !important;
+    background: #fdf6f2 !important;
+    border: 1px solid #f5ddd2 !important;
+    border-radius: 8px !important;
+    font-size: 0.78rem !important;
 }
 
-/* ── Buttons (feedback) ── */
+/* ── Buttons ── */
 [data-testid="stButton"] button {
-    background: #111118 !important;
-    border: 1px solid #2a2a3e !important;
-    color: #7a7a9a !important;
-    border-radius: 3px !important;
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.75rem !important;
-    padding: 2px 10px !important;
-    transition: all 0.15s ease !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    background: #fff !important;
+    border: 1.5px solid #e8e2d9 !important;
+    color: #555 !important;
+    border-radius: 8px !important;
+    transition: all 0.15s !important;
 }
 
 [data-testid="stButton"] button:hover {
-    border-color: #4a9eff !important;
-    color: #4a9eff !important;
-    background: #0d1020 !important;
+    border-color: #e8632a !important;
+    color: #e8632a !important;
+    background: #fdf6f2 !important;
 }
 
-/* Clear chat button special */
 [data-testid="stSidebar"] [data-testid="stButton"] button {
     width: 100% !important;
-    border-color: #3a1a1a !important;
-    color: #aa4444 !important;
-}
-
-[data-testid="stSidebar"] [data-testid="stButton"] button:hover {
-    border-color: #ff4444 !important;
-    color: #ff4444 !important;
-    background: #1a0a0a !important;
-}
-
-/* ── Caption (feedback labels) ── */
-.stCaption small, .stCaption p {
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.68rem !important;
 }
 
 /* ── Divider ── */
 hr {
-    border-color: #1e1e2e !important;
+    border-color: #f0ede8 !important;
+    margin: 12px 0 !important;
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #0a0a0f; }
-::-webkit-scrollbar-thumb { background: #2a2a4e; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: #4a9eff; }
-
-/* ── Blinking cursor on title ── */
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
-}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e8e2d9; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #e8632a; }
 </style>
 """, unsafe_allow_html=True)
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("""
-<div style="margin-bottom: 0.2rem; padding-top: 0.5rem;">
-    <div style="font-family:'Space Mono',monospace; font-size:0.65rem; color:#3a3a5a; letter-spacing:0.15em; margin-bottom:6px;">
-        ▸ SYSTEM ONLINE · CRAWL4AI DOCS v2.0
+<div style="display:flex; align-items:center; gap:10px; margin-bottom:4px; padding-top:8px;">
+    <div style="width:34px; height:34px; background:#1a1a1a; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">🕸️</div>
+    <div>
+        <div style="font-family:'Inter',sans-serif; font-weight:600; font-size:1.05rem; color:#1a1a1a; letter-spacing:-0.02em; line-height:1.3;">
+            Crawl4AI Docs
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:0.7rem; color:#aaa; line-height:1.3;">
+            Documentation assistant
+        </div>
     </div>
-    <h1 style="font-family:'Syne',sans-serif; font-weight:800; font-size:1.8rem; color:#f0f0ff; margin:0; letter-spacing:-0.03em;">
-        WebCrawl<span style="color:#4a9eff;">_</span>AI
-        <span style="font-size:1rem; color:#00ffaa; font-family:'Space Mono',monospace; font-weight:400;">docs</span>
-    </h1>
 </div>
+<div style="height:1px; background:#f0ede8; margin:12px 0 8px;"></div>
 """, unsafe_allow_html=True)
-
-st.caption("HYBRID SEARCH · CROSS-ENCODER RERANKING · SELF-IMPROVING RAG")
-
-st.markdown("<div style='height:1px; background:linear-gradient(90deg,#4a9eff22,#00ffaa22,transparent); margin-bottom:1rem;'></div>", unsafe_allow_html=True)
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
@@ -256,26 +210,25 @@ if "feedback" not in st.session_state:
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style="font-family:'Space Mono',monospace; font-size:0.6rem; color:#3a3a5a; letter-spacing:0.15em; padding: 8px 0 4px;">
-        ◈ PIPELINE STATUS
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div style="font-family:'Space Mono',monospace; font-size:0.7rem; line-height:2; color:#5a5a7a; padding: 4px 0;">
-        <span style="color:#00ffaa;">✓</span> Semantic · Pinecone<br>
-        <span style="color:#00ffaa;">✓</span> Keyword · BM25<br>
-        <span style="color:#00ffaa;">✓</span> Rank Fusion · RRF<br>
-        <span style="color:#00ffaa;">✓</span> Reranker · Cross-Encoder<br>
-        <span style="color:#00ffaa;">✓</span> Memory · Short + Long<br>
-        <span style="color:#00ffaa;">✓</span> Query Rewriter<br>
-        <span style="color:#00ffaa;">✓</span> Hallucination Guard<br>
+    <div style="padding:16px 0 8px;">
+        <div style="font-family:'Inter',sans-serif; font-size:0.65rem; font-weight:600; color:#bbb; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:10px;">
+            Pipeline
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:0.78rem; line-height:2.1; color:#555;">
+            <span style="display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:8px;"></span>Semantic search · Pinecone<br>
+            <span style="display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:8px;"></span>BM25 keyword search<br>
+            <span style="display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:8px;"></span>Reciprocal Rank Fusion<br>
+            <span style="display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:8px;"></span>Cross-encoder reranking<br>
+            <span style="display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:8px;"></span>Short + long-term memory<br>
+            <span style="display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:8px;"></span>Query rewriting<br>
+            <span style="display:inline-block; width:7px; height:7px; background:#22c55e; border-radius:50%; margin-right:8px;"></span>Hallucination guard<br>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.divider()
 
-    if st.button("⌫  Clear session"):
+    if st.button("Clear conversation"):
         st.session_state.messages = []
         st.session_state.feedback = {}
         st.rerun()
@@ -283,11 +236,31 @@ with st.sidebar:
     st.divider()
 
     st.markdown("""
-    <div style="font-family:'Space Mono',monospace; font-size:0.6rem; color:#3a3a5a; letter-spacing:0.15em; padding-bottom:4px;">
-        ◈ FEEDBACK LOG
+    <div style="font-family:'Inter',sans-serif; font-size:0.65rem; font-weight:600; color:#bbb; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px;">
+        Feedback
     </div>
     """, unsafe_allow_html=True)
     st.info(get_feedback_summary())
+
+# ── Empty state ───────────────────────────────────────────────────────────────
+if not st.session_state.messages:
+    st.markdown("""
+    <div style="text-align:center; padding:52px 0 28px;">
+        <div style="font-size:2.4rem; margin-bottom:14px;">🕸️</div>
+        <div style="font-family:'Inter',sans-serif; font-size:1.25rem; font-weight:600; color:#1a1a1a; margin-bottom:6px; letter-spacing:-0.02em;">
+            How can I help?
+        </div>
+        <div style="font-family:'Inter',sans-serif; font-size:0.85rem; color:#aaa; max-width:380px; margin:0 auto; line-height:1.6;">
+            Ask me anything about Crawl4AI — installation, crawling, extraction, or the API.
+        </div>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:36px;">
+        <div style="background:#fff; border:1.5px solid #f0ede8; border-radius:10px; padding:9px 15px; font-family:'Inter',sans-serif; font-size:0.78rem; color:#555; cursor:default;">How do I install Crawl4AI?</div>
+        <div style="background:#fff; border:1.5px solid #f0ede8; border-radius:10px; padding:9px 15px; font-family:'Inter',sans-serif; font-size:0.78rem; color:#555; cursor:default;">How to extract structured data?</div>
+        <div style="background:#fff; border:1.5px solid #f0ede8; border-radius:10px; padding:9px 15px; font-family:'Inter',sans-serif; font-size:0.78rem; color:#555; cursor:default;">What is AsyncWebCrawler?</div>
+        <div style="background:#fff; border:1.5px solid #f0ede8; border-radius:10px; padding:9px 15px; font-family:'Inter',sans-serif; font-size:0.78rem; color:#555; cursor:default;">How to use CSS selectors?</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ── Chat history ──────────────────────────────────────────────────────────────
 for i, msg in enumerate(st.session_state.messages):
@@ -319,7 +292,7 @@ for i, msg in enumerate(st.session_state.messages):
                 st.caption("✅ Helpful" if val else "❌ Not helpful")
 
 # ── Input ─────────────────────────────────────────────────────────────────────
-user_input = st.chat_input("› query docs: installation, crawling, API, extraction ...")
+user_input = st.chat_input("Ask anything about Crawl4AI...")
 
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -330,9 +303,7 @@ if user_input:
     with st.chat_message("assistant"):
         placeholder = st.empty()
         response = ""
-
-        placeholder.markdown("_`scanning vector index...`_")
-
+        placeholder.markdown("_Searching documentation..._")
         for token in rag_pipeline(user_input):
             response += token
             placeholder.markdown(response)
